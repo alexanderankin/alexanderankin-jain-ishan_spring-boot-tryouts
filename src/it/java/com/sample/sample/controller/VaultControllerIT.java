@@ -6,6 +6,9 @@ import lombok.Data;
 import lombok.experimental.Accessors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.RequestEntity;
+import org.springframework.http.ResponseEntity;
 import org.springframework.vault.core.VaultTemplate;
 import org.springframework.vault.support.VaultResponse;
 
@@ -21,6 +24,32 @@ class VaultControllerIT extends BaseIntegrationTest {
 
     @Test
     void test_gettingFeatureFlags() {
+        RequestEntity<Void> getFeatures = RequestEntity
+                .get("/v1/secrets/{id}", "features")
+                .headers(authHeaders())
+                .build();
+        ResponseEntity<FeatureFlags> exchange = testRestTemplate.exchange(getFeatures, FeatureFlags.class);
+        assertThat(exchange.getStatusCode(), is(HttpStatus.OK));
+        assertThat(exchange.getBody(), is(not(nullValue())));
+        assertThat(exchange.getBody(), is(is(
+                new FeatureFlags()
+                        .setSample(new FeatureFlags.Sample()
+                                .setFeatures(Map.of("abc", true))))
+        ));
+    }
+
+    @Test
+    void test_failsToGetUnknownFeatureFlag() {
+        RequestEntity<Void> getFeatures = RequestEntity
+                .get("/v1/secrets/{id}", "test_failsToGetUnknownFeatureFlag")
+                .headers(authHeaders())
+                .build();
+        ResponseEntity<FeatureFlags> exchange = testRestTemplate.exchange(getFeatures, FeatureFlags.class);
+        assertThat(exchange.getStatusCode(), is(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
+    void test_readingFeatureFlags() {
         VaultResponse features = vaultTemplate.opsForKeyValue("secrets", KV_1)
                 .get("apps/global/features");
 
