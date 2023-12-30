@@ -12,7 +12,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class CustomerServiceImpl implements CustomerService {
 
-    private CustomerRepository customerRepository;
+    final CustomerRepository customerRepository;
 
     @Override
     public void createCustomer() {

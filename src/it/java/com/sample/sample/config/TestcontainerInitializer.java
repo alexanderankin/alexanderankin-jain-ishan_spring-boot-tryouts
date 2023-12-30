@@ -6,10 +6,8 @@ import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.MapPropertySource;
 import org.testcontainers.consul.ConsulContainer;
-import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.MySQLContainer;
-import org.testcontainers.containers.wait.strategy.HttpWaitStrategy;
 import org.testcontainers.images.PullPolicy;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.DockerImageName;
@@ -29,22 +27,27 @@ public final class TestcontainerInitializer implements ApplicationContextInitial
     public static final String MYSQL_DOCKER_IMAGE = "mysql";
     public static final String MYSQL_DOCKER_IMAGE_VERSION = "5.7.32";
 
-    public static final MySQLContainer mySQLContainer;
+    private static final MySQLContainer<?> mySQLContainer;
     private static final KafkaContainer kafkaContainer;
-//    private static final VaultContainer<?> vaultContainer;
+    // private static final VaultContainer<?> vaultContainer;
     private static final ConsulContainer consulContainer;
 
     static {
-        mySQLContainer = (MySQLContainer) new MySQLContainer(DockerImageName.parse(MYSQL_DOCKER_IMAGE)
-                .withTag(MYSQL_DOCKER_IMAGE_VERSION)).withImagePullPolicy(PullPolicy.defaultPolicy()).withReuse(true);
+        // noinspection resource
+        mySQLContainer = new MySQLContainer<>(DockerImageName.parse(MYSQL_DOCKER_IMAGE)
+                .withTag(MYSQL_DOCKER_IMAGE_VERSION))
+                .withImagePullPolicy(PullPolicy.defaultPolicy())
+                .withReuse(true);
 
         kafkaContainer = new KafkaContainer(
-                DockerImageName.parse(KAFKA_DOCKER_IMAGE).withTag(KAFKA_DOCKER_IMAGE_VERSION)).withReuse(true);
+                DockerImageName.parse(KAFKA_DOCKER_IMAGE).withTag(KAFKA_DOCKER_IMAGE_VERSION))
+                .withReuse(true);
 
         consulContainer =
                 new ConsulContainer(DockerImageName.parse(CONSUL_DOCKER_IMAGE).withTag(CONSUL_DOCKER_IMAGE_VERSION))
-                        .waitingFor(new HttpWaitStrategy().forPort(8500)
-                                .withStartupTimeout(Duration.ofSeconds(5))).withReuse(true);
+                        // .waitingFor(new HttpWaitStrategy().forPort(8500)
+                        //         .withStartupTimeout(Duration.ofSeconds(5)))
+                        .withReuse(true);
 
 //        vaultContainer =
 //                new VaultContainer<>(DockerImageName.parse(VAULT_DOCKER_IMAGE).withTag(VAULT_DOCKER_IMAGE_VERSION))
@@ -74,8 +77,8 @@ public final class TestcontainerInitializer implements ApplicationContextInitial
 //                        "spring.cloud.vault.port", vaultContainer.getFirstMappedPort(),
                         "spring.cloud.consul.port", consulContainer.getFirstMappedPort(),
                         "spring.datasource.url",
-                        "jdbc:mysql://" + mySQLContainer.getHost() + ":" + mySQLContainer.getFirstMappedPort() +
-                        "/tryout?createDatabaseIfNotExist=true&user=root&password=test",
+                        mySQLContainer.getJdbcUrl()+"jdbc:mysql://" + mySQLContainer.getHost() + ":" + mySQLContainer.getFirstMappedPort() +
+                                "/tryout?createDatabaseIfNotExist=true&user=root&password=test",
 //                        "spring.datasource.username", mySQLContainer.getUsername(),
 //                        "spring.datasource.password", mySQLContainer.getPassword(),
                         "spring.datasource.driver-class-name", mySQLContainer.getDriverClassName()
