@@ -1,5 +1,7 @@
 {
   "sample": {
-    "features": {}
+    "features": {
+      "abc": true
+    }
   }
 }

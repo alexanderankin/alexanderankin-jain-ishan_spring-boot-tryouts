@@ -2,17 +2,23 @@ package com.sample.sample.config;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import lombok.SneakyThrows;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.core.env.MapPropertySource;
 import org.testcontainers.consul.ConsulContainer;
+import org.testcontainers.containers.BindMode;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.images.PullPolicy;
+import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.DockerImageName;
+import org.testcontainers.vault.VaultContainer;
 
-import java.time.Duration;
+import java.lang.reflect.Field;
 import java.util.Map;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -27,9 +33,13 @@ public final class TestcontainerInitializer implements ApplicationContextInitial
     public static final String MYSQL_DOCKER_IMAGE = "mysql";
     public static final String MYSQL_DOCKER_IMAGE_VERSION = "5.7.32";
 
+    @Container
     private static final MySQLContainer<?> mySQLContainer;
+    @Container
     private static final KafkaContainer kafkaContainer;
-    // private static final VaultContainer<?> vaultContainer;
+    @Container
+    private static final VaultContainer<?> vaultContainer;
+    @Container
     private static final ConsulContainer consulContainer;
 
     static {
@@ -49,20 +59,31 @@ public final class TestcontainerInitializer implements ApplicationContextInitial
                         //         .withStartupTimeout(Duration.ofSeconds(5)))
                         .withReuse(true);
 
-//        vaultContainer =
-//                new VaultContainer<>(DockerImageName.parse(VAULT_DOCKER_IMAGE).withTag(VAULT_DOCKER_IMAGE_VERSION))
-//                        .withVaultToken("test-root-token")
-//                        .withReuse(true)
-//                        .withClasspathResourceMapping("testdata/feature_flags.json",
-//                                "feature_flags.json",
-//                                BindMode.READ_ONLY)
-//                        .withSecretInVault("secret/apps/" + "sampleapp", "feature=true")
-//                        .withInitCommand("login test-root-token")
-//                        .withInitCommand("secrets enable -version=2 kv")
-//                        .withInitCommand("secrets enable -path=secrets kv")
-//                        .withInitCommand("kv put -format=json secrets/apps/global/features @feature_flags.json");
+        // noinspection resource
+        vaultContainer =
+                new VaultContainer<>(DockerImageName.parse(VAULT_DOCKER_IMAGE).withTag(VAULT_DOCKER_IMAGE_VERSION))
+                        .withVaultToken("test-root-token")
+                        .withReuse(true)
+                        .withClasspathResourceMapping("testdata/feature_flags.json",
+                                "feature_flags.json",
+                                BindMode.READ_ONLY)
+                        .withSecretInVault("secret/apps/" + "sampleapp", "feature=true")
+                        .withInitCommand("login test-root-token")
+                        .withInitCommand("secrets enable -version=2 kv")
+                        .withInitCommand("secrets enable -path=secrets kv")
+                        .withInitCommand("kv put -format=json secrets/apps/global/features @feature_flags.json");
 //        Startables.deepStart(vaultContainer, consulContainer, kafkaContainer, mySQLContainer).join();
-        Startables.deepStart(consulContainer, kafkaContainer, mySQLContainer).join();
+        Startables.deepStart(
+                FieldUtils.getFieldsListWithAnnotation(TestcontainerInitializer.class, Container.class).stream()
+                        .map(TestcontainerInitializer::readStaticField)
+                        .map(GenericContainer.class::cast)
+                        .toList()
+        ).join();
+    }
+
+    @SneakyThrows
+    private static Object readStaticField(Field field) {
+        return FieldUtils.readStaticField(field, true);
     }
 
     public static String getKafkaContainerBootstrapServer() {
@@ -74,10 +95,12 @@ public final class TestcontainerInitializer implements ApplicationContextInitial
         applicationContext.getEnvironment().getPropertySources().addFirst(
                 new MapPropertySource("mysqlContainer", Map.of(
                         "jaja.kafka.bootstrap.servers", kafkaContainer.getBootstrapServers(),
-//                        "spring.cloud.vault.port", vaultContainer.getFirstMappedPort(),
+                        "spring.cloud.vault.uri", vaultContainer.getHttpHostAddress(),
+                        "spring.cloud.vault.token", vaultContainer.getEnvMap().get("VAULT_TOKEN"),
+                        "spring.cloud.vault.authentication", "TOKEN",
                         "spring.cloud.consul.port", consulContainer.getFirstMappedPort(),
                         "spring.datasource.url",
-                        mySQLContainer.getJdbcUrl()+"jdbc:mysql://" + mySQLContainer.getHost() + ":" + mySQLContainer.getFirstMappedPort() +
+                        mySQLContainer.getJdbcUrl() + "jdbc:mysql://" + mySQLContainer.getHost() + ":" + mySQLContainer.getFirstMappedPort() +
                                 "/tryout?createDatabaseIfNotExist=true&user=root&password=test",
 //                        "spring.datasource.username", mySQLContainer.getUsername(),
 //                        "spring.datasource.password", mySQLContainer.getPassword(),
