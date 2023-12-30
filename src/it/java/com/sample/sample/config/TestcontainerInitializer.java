@@ -25,7 +25,7 @@ public final class TestcontainerInitializer implements ApplicationContextInitial
     public static final String VAULT_DOCKER_IMAGE = "vault";
     public static final String VAULT_DOCKER_IMAGE_VERSION = "1.10.7";
     public static final String MYSQL_DOCKER_IMAGE = "mysql";
-    public static final String MYSQL_DOCKER_IMAGE_VERSION = "5.7.32";
+    public static final String MYSQL_DOCKER_IMAGE_VERSION = "5.7.12";
 
     private static final MySQLContainer<?> mySQLContainer;
     private static final KafkaContainer kafkaContainer;
